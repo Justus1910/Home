@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Snake Klon</title>
+    <style>
+        body {
+            background-color: #4e7cf6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .score-board {
+            background-color: #4a752c;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        canvas {
+            display: block;
+            background-color: #aad751;
+        }
+
+        /* Start- und Game Over Bildschirm */
+        #overlay {
+            position: absolute;
+            top: 54px; /* Höhe des Score-Boards */
+            left: 0;
+            width: 400px;
+            height: 400px;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 10;
+        }
+
+        h1 { margin-bottom: 10px; color: #aad751; }
+        p { margin: 5px 0 20px 0; font-size: 18px; }
+
+        button {
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            background-color: #4e7cf6;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #3b62cc;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="score-board">
+            <span>Score: <span id="score">0</span></span>
+            <span>Best: <span id="highscore">0</span></span>
+        </div>
+        
+        <canvas id="snakeCanvas" width="400" height="400"></canvas>
+
+        <div id="overlay">
+            <h1 id="overlay-title">Snake Game</h1>
+            <p id="final-score" style="display: none;">Dein Score: 0</p>
+            <button id="start-btn">Spiel starten</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("snakeCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const highscoreElement = document.getElementById("highscore");
+        const overlay = document.getElementById("overlay");
+        const overlayTitle = document.getElementById("overlay-title");
+        const finalScoreText = document.getElementById("final-score");
+        const startBtn = document.getElementById("start-btn");
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+
+        let score = 0;
+        let highscore = localStorage.getItem("snake_highscore") || 0;
+        highscoreElement.innerText = highscore;
+
+        let dx = 1;
+        let dy = 0;
+        let snake = [];
+        let foodX, foodY;
+        let gameRunning = false;
+        let gameLoop;
+
+        function initGame() {
+            snake = [
+                {x: 10, y: 10},
+                {x: 9, y: 10},
+                {x: 8, y: 10}
+            ];
+            dx = 1; dy = 0;
+            score = 0;
+            scoreElement.innerText = score;
+            createFood();
+            gameRunning = true;
+            overlay.style.display = "none";
+            
+            if(gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(draw, 100);
+        }
+
+        function draw() {
+            if (!gameRunning) return;
+
+            advanceSnake();
+            if (checkGameOver()) {
+                endGame();
+                return;
+            }
+
+            clearCanvas();
+            drawFood();
+            drawSnake();
+        }
+
+        function clearCanvas() {
+            for (let row = 0; row < tileCount; row++) {
+                for (let col = 0; col < tileCount; col++) {
+                    ctx.fillStyle = (row + col) % 2 === 0 ? "#aad751" : "#a2d149";
+                    ctx.fillRect(col * gridSize, row * gridSize, gridSize, gridSize);
+                }
+            }
+        }
+
+        function drawSnake() {
+            snake.forEach((part, index) => {
+                ctx.fillStyle = (index === 0) ? "#4674e9" : "#578a34";
+                ctx.fillRect(part.x * gridSize, part.y * gridSize, gridSize - 1, gridSize - 1);
+            });
+        }
+
+        function advanceSnake() {
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            snake.unshift(head);
+
+            if (head.x === foodX && head.y === foodY) {
+                score++;
+                scoreElement.innerText = score;
+                if (score > highscore) {
+                    highscore = score;
+                    highscoreElement.innerText = highscore;
+                    localStorage.setItem("snake_highscore", highscore);
+                }
+                createFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function checkGameOver() {
+            const head = snake[0];
+            // Wand-Kollision
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) return true;
+            // Selbst-Kollision
+            for (let i = 1; i < snake.length; i++) {
+                if (snake[i].x === head.x && snake[i].y === head.y) return true;
+            }
+            return false;
+        }
+
+        function createFood() {
+            foodX = Math.floor(Math.random() * tileCount);
+            foodY = Math.floor(Math.random() * tileCount);
+            // Verhindern, dass Essen auf der Schlange spawnt
+            snake.forEach(part => {
+                if(part.x === foodX && part.y === foodY) createFood();
+            });
+        }
+
+        function drawFood() {
+            ctx.fillStyle = "#e74c3c";
+            ctx.beginPath();
+            ctx.arc(foodX * gridSize + gridSize/2, foodY * gridSize + gridSize/2, gridSize/2 - 2, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameLoop);
+            overlay.style.display = "flex";
+            overlayTitle.innerText = "Game Over!";
+            finalScoreText.innerText = "Dein Score: " + score;
+            finalScoreText.style.display = "block";
+            startBtn.innerText = "Nochmal versuchen";
+        }
+
+        // Steuerung
+        window.addEventListener("keydown", e => {
+            if (!gameRunning) return;
+            const LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40;
+            const key = e.keyCode;
+
+            if (key === LEFT && dx === 0) { dx = -1; dy = 0; }
+            if (key === UP && dy === 0) { dx = 0; dy = -1; }
+            if (key === RIGHT && dx === 0) { dx = 1; dy = 0; }
+            if (key === DOWN && dy === 0) { dx = 0; dy = 1; }
+        });
+
+        startBtn.addEventListener("click", initGame);
+
+        // Initiales Zeichnen des leeren Feldes
+        clearCanvas();
+    </script>
+</body>
+</html>
